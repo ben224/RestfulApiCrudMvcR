@@ -1,0 +1,13 @@
+@model System.Linq.IGrouping<System.Web.Http.Controllers.HttpControllerDescriptor, System.Web.Http.Description.ApiDescription>
+
+<div class="api-group">
+    <h3>@Model.Key.ControllerName</h3>
+    <ul>
+    @foreach (var api in Model)
+    {
+        <li>
+            @Html.Partial("Api", api)
+        </li>
+    }
+    </ul>
+</div>

@@ -1,0 +1,189 @@
+﻿
+
+
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>產品管理</h2>
+
+        <form id="productForm" class="form-inline" onsubmit="return false;">
+            <input type="text" id="productid" class="form-control" placeholder="編號" />
+            <div class="form-group">
+                <input type="text" id="name" class="form-control" placeholder="名稱" />
+            </div>
+            <div class="form-group">
+                <input type="number" id="price" class="form-control" placeholder="價格" />
+            </div>
+            <div class="form-group">
+                <input type="number" id="stock" class="form-control" placeholder="庫存" />
+            </div>
+            <button id="createBtn" class="btn btn-primary">新增</button>
+            <button id="updateBtn" class="btn btn-success" style="display:none;">更新</button>
+            <button id="cancelEditBtn" class="btn btn-default" style="display:none;">取消</button>
+        </form>
+
+        <table class="table table-bordered table-striped" id="productsTable" style="margin-top:15px;">
+            <thead>
+                <tr>
+                    <th>編號</th>
+                    <th>名稱</th>
+                    <th>價格</th>
+                    <th>庫存</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <div id="status" class="text-muted"></div>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+    $(function () {
+            var apiUrl = '/api/products';
+
+            function setStatus(msg, isError) {
+                var el = $('#status');
+                el.text(msg);
+                el.toggleClass('text-danger', !!isError);
+            }
+
+            function loadProducts() {
+                setStatus('載入中...');
+                $.get(apiUrl)
+                    .done(function (data) {
+                        renderTable(data);
+                        setStatus('');
+                    })
+                    .fail(function (xhr) {
+                        setStatus('載入失敗: ' + (xhr.statusText || xhr.responseText), true);
+                    });
+            }
+
+            function renderTable(items) {
+                var tbody = $('#productsTable tbody').empty();
+                if (!items || items.length === 0) {
+                    tbody.append('<tr><td colspan="5" class="text-center">無資料</td></tr>');
+                    return;
+                }
+                // 使用原生 forEach，參數順序 (item, index)
+                items.forEach(function (p, i) {
+                    var tr = $('<tr>');
+                    tr.append($('<td>').text(p.ProductId));
+                    tr.append($('<td>').text(p.Name));
+                    tr.append($('<td>').text(p.Price));
+                    tr.append($('<td>').text(p.Stock));
+                    var actions = $('<td>');
+                    var editBtn = $('<button>').addClass('btn btn-xs btn-info').text('編輯');
+                    editBtn.on('click', function () { startEdit(p); });
+                    var delBtn = $('<button>').addClass('btn btn-xs btn-danger').text('刪除');
+                    delBtn.on('click', function () { deleteProduct(p.ProductId); });
+                    actions.append(editBtn).append(' ').append(delBtn);
+                    tr.append(actions);
+                    tbody.append(tr);
+                });
+            }
+
+            function getFormData() {
+                return {
+                    ProductId: parseInt($('#productid').val(), 10),
+                    Name: $('#name').val(),
+                    Price: parseInt($('#price').val(), 10) || 0,
+                    Stock: parseInt($('#stock').val(), 10) || 0
+                };
+            }
+
+            function validate(product, requireId) {
+                if (requireId && (!product.ProductId || product.ProductId <= 0)) { setStatus('請選擇要更新的商品', true); return false; }
+                if (!product.Name) { setStatus('名稱為必填', true); return false; }
+                if (isNaN(product.Price)) { setStatus('價格必須為數字', true); return false; }
+                if (isNaN(product.Stock)) { setStatus('庫存必須為數字', true); return false; }
+                return true;
+            }
+
+            function clearForm() {
+                $('#productid').val('');
+                $('#name').val('');
+                $('#price').val('');
+                $('#stock').val('');
+                $('#createBtn').show();
+                $('#updateBtn, #cancelEditBtn').hide();
+                setStatus('');
+            }
+
+            function startEdit(p) {
+                // 統一使用 ProductId 命名
+                $('#productid').val(p.ProductId);
+                $('#name').val(p.Name);
+                $('#price').val(p.Price);
+                $('#stock').val(p.Stock);
+                $('#createBtn').hide();
+                $('#updateBtn, #cancelEditBtn').show();
+                setStatus('編輯 ProductId=' + p.ProductId);
+                $('html, body').animate({ scrollTop: $('#productForm').offset().top - 60 }, 200);
+            }
+
+            function createProduct() {
+                var product = getFormData();
+                if (!validate(product, false)) return;
+                $.ajax({
+                    url: apiUrl,
+                    type: 'POST',
+                    data: JSON.stringify(product),
+                    contentType: 'application/json; charset=utf-8'
+                })
+                    .done(function () {
+                        setStatus('新增成功');
+                        clearForm();
+                        loadProducts();
+                    })
+                    .fail(function (xhr) {
+                        setStatus('新增失敗: ' + (xhr.responseText || xhr.statusText), true);
+                    });
+            }
+
+            function updateProduct() {
+                var product = getFormData();
+                if (!validate(product, true)) return;
+                $.ajax({
+                    url: apiUrl + '/' + product.ProductId,
+                    type: 'PUT',
+                    data: JSON.stringify(product),
+                    contentType: 'application/json; charset=utf-8'
+                })
+                    .done(function () {
+                        setStatus('更新成功');
+                        clearForm();
+                        loadProducts();
+                    })
+                    .fail(function (xhr) {
+                        setStatus('更新失敗: ' + (xhr.responseText || xhr.statusText), true);
+                    });
+            }
+
+            function deleteProduct(id) {
+                if (!confirm('確定刪除 ProductId=' + id + ' ?')) return;
+                $.ajax({
+                    url: apiUrl + '/' + id,
+                    type: 'DELETE'
+                })
+                    .done(function () {
+                        setStatus('刪除成功');
+                        loadProducts();
+                    })
+                    .fail(function (xhr) {
+                        setStatus('刪除失敗: ' + (xhr.responseText || xhr.statusText), true);
+                    });
+            }
+
+            $('#createBtn').on('click', function (e) { e.preventDefault(); createProduct(); });
+            $('#updateBtn').on('click', function (e) { e.preventDefault(); updateProduct(); });
+            $('#cancelEditBtn').on('click', function (e) { e.preventDefault(); clearForm(); });
+
+            // 初始化
+            clearForm();
+            loadProducts();
+        });</script>
+}
